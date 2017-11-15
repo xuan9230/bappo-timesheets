@@ -1,5 +1,6 @@
 import React from 'react';
 import { styled, View, Text, Button } from 'bappo-components';
+import BorderButton from './components/BorderButton';
 
 const EntryDetails = ({
   entry,
@@ -31,10 +32,10 @@ const EntryDetails = ({
         <FieldName>Notes</FieldName>
       </NameContainer>
       <ValueContainer>
-        <FieldValue>{entry.notes}</FieldValue>
+        <Text>{entry.notes}</Text>
         <ButtonsContainer>
-          <EditButton onPress={openEditForm}>Edit</EditButton>
-          <EditButton onPress={deleteEntry}>Delete</EditButton>
+          <MarginedButton onPress={openEditForm}><Text>Edit</Text></MarginedButton>
+          <BorderButton onPress={deleteEntry}><Text>Delete</Text></BorderButton>
         </ButtonsContainer>
       </ValueContainer>
     </Container>
@@ -62,19 +63,11 @@ const ValueContainer = styled(View)`
   flex-basis: 70%;
 `;
 
-const FieldValue = styled(Text)`
-`;
-
 const ButtonsContainer = styled(View)`
   flex-direction: row;
   margin-top: 20px;
 `;
 
-const EditButton = styled(Button)`
-  padding: 7px;
-  border-style: solid;
-  border-radius: 4px;
-  border-width: 0.5px;
-  border-color: #ccc;
-  margin-right: 20px;
+const MarginedButton = styled(BorderButton)`
+  margin-right: 15px;
 `;

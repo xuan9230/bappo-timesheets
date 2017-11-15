@@ -1,6 +1,6 @@
 import React from 'react';
 import moment from 'moment';
-import { styled, View, Button, ActivityIndicator } from 'bappo-components';
+import { styled, View, Button, Text, ActivityIndicator } from 'bappo-components';
 import EntryDetails from './EntryDetails';
 
 class JobRows extends React.Component {
@@ -24,26 +24,26 @@ class JobRows extends React.Component {
   fetchList = () => {
     this.setState({ loading: true }, async () => {
       const { $models, timesheet } = this.props;
-      const jobs = await $models.Job.findAll();
-
-      // Initialize work time map of the week
+      const jobs = [];
       const entryMap = [];
-      jobs.forEach(job => entryMap[parseInt(job.id)] = []);
-      entryMap.forEach(m => m.push(0, 0, 0, 0, 0));
 
       const entries = await $models.TimesheetEntry.findAll({
         where: {
           timesheet_id: timesheet.id,
         },
-        // include: [
-        //   { as: 'employee' },
-        //   { as: 'job' }
-        // ]
+        include: [
+          { as: 'job' }
+        ]
       });
 
+      // Build entry map and track all involved jobs
       entries.forEach(e => {
         const dow = moment(e.date).day();
-        entryMap[parseInt(e.job_id)][dow] = e;
+        if (!entryMap[e.job_id]) {
+          entryMap[e.job_id] = [];
+          jobs.push(e.job);
+        }
+        entryMap[e.job_id][dow] = e;
       });
 
       this.setState({ entries, entryMap, jobs, loading: false, selectedEntry: null });
@@ -72,11 +72,43 @@ class JobRows extends React.Component {
     }
   }
 
+  handleAddJob = () => {
+    const addJobRow = (data) => {
+      console.log(data);
+    }
+
+    const { $popup } = this.props;
+    $popup.form({
+      formKey: 'SelectJobForm',
+      onSubmit: addJobRow,
+    });
+  }
+
+  handleDeleteJobRow = async (jobId) => {
+    const entriesToDelete = this.state.entryMap[jobId];
+    const promiseArr = [];
+
+    entriesToDelete.forEach(entry => {
+      if (entry) {
+        console.log(entry);
+        promiseArr.push(this.props.$models.TimesheetEntry.destroyById(entry.id));
+      }
+    })
+
+    await Promise.all(promiseArr);
+    this.fetchList();
+  }
+
   renderJobRow = (job) => {
     let total = 0;
     return (
       <JobRowContainer key={job.name}>
-        <Cell>{job.name}</Cell>
+        <RowCell>
+          <DeleteJobButton onPress={() => this.handleDeleteJobRow(parseInt(job.id))}>
+            <DeleteButtonText>x</DeleteButtonText>
+          </DeleteJobButton>
+          <Text>{job.name}</Text>
+        </RowCell>
         {
           Array
             .from({ length: 5 }, (v, i) => i+1)
@@ -92,15 +124,15 @@ class JobRows extends React.Component {
                 <JobCell key={`${job.id}_${dow}`}>
                   <StyledButton
                     hasValue={!!entry}
-                    onPress={() => this.handleClickCell(entry.id, dow, job.id)}
+                    onPress={() => this.handleClickCell(entry && entry.id, dow, job.id)}
                   >
-                    {hourOfDay ? hourOfDay : 'Add'}
+                    <Text>{hourOfDay ? hourOfDay : 'Add'}</Text>
                   </StyledButton>
                 </JobCell>
               );
             })
         }
-        <TotalCell>{total}</TotalCell>
+        <TotalCell><Text>{total}</Text></TotalCell>
       </JobRowContainer>
     )
   }
@@ -111,7 +143,7 @@ class JobRows extends React.Component {
 
     return (
       <JobRowContainer>
-        <Cell>Total</Cell>
+        <Cell><Text>Total</Text></Cell>
         {
           Array
             .from({ length: 5 }, (v, i) => i+1)
@@ -127,12 +159,12 @@ class JobRows extends React.Component {
 
               return (
                 <TotalCell key={`${dow}_total`}>
-                  {dayTotal}
+                  <Text>{dayTotal}</Text>
                 </TotalCell>
               );
             })
         }
-        <TotalCell>{weekTotal}</TotalCell>
+        <TotalCell><Text>{weekTotal}</Text></TotalCell>
       </JobRowContainer>
     );
   }
@@ -146,6 +178,9 @@ class JobRows extends React.Component {
     return (
       <Container>
         { jobs.map(this.renderJobRow) }
+        <NewJobButton onPress={this.handleAddJob}>
+          <Text>New Job</Text>
+        </NewJobButton>
         { this.renderTotalRow() }
         {
           selectedEntry &&
@@ -176,6 +211,12 @@ const Cell = styled(View)`
   align-items: center;
 `;
 
+const RowCell = styled(View)`
+  flex: 1;
+  flex-direction: row;
+  justify-content: center;
+`;
+
 const JobCell = styled(Cell)`
   &:hover {
     background-color: #eee;
@@ -194,4 +235,18 @@ const StyledButton = styled(Button)`
   align-items: center;
   ${props => !props.hasValue &&
     'opacity: 0;'}
+`;
+
+const DeleteJobButton = styled(Button)`
+  margin-right: 10px;
+`;
+
+const DeleteButtonText = styled(Text)`
+  color: red;
+`;
+
+const NewJobButton = styled(Button)`
+  width: 14.3%;
+  align-items: center;
+  margin-bottom: 7px;
 `;

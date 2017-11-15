@@ -12,8 +12,12 @@ const TimesheetHeader = ({
       <Title>
         {`${timesheet.person.name}'s Timesheet`}
       </Title>
-      <SwitchButton onPress={() => switchWeek(false)}>{'<'}</SwitchButton>
-      <SwitchButton onPress={() => switchWeek(true)}>{'>'}</SwitchButton>
+      <SwitchButton onPress={() => switchWeek(false)}>
+        <ButtonText>{'<'}</ButtonText>
+      </SwitchButton>
+      <SwitchButton onPress={() => switchWeek(true)}>
+        <ButtonText>{'>'}</ButtonText>
+      </SwitchButton>
     </Container>
   );
 };
@@ -31,8 +35,11 @@ const Title = styled(Text)`
 `;
 
 const SwitchButton = styled(Button)`
-  font-size: 20px;
-  color: grey;
   margin-left: 7px;
   margin-right: 7px;
+`;
+
+const ButtonText = styled(Text)`
+  font-size: 20px;
+  color: grey;
 `;
