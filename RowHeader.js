@@ -1,23 +1,25 @@
 import React from 'react';
+import moment from 'moment';
 import { styled, View, Text } from 'bappo-components';
 
-const values = [
-  'Job',
+const weekdays = [
   'Mon',
   'Tue',
   'Wed',
   'Thu',
-  'Fri',
-  'Total'
+  'Fri'
 ];
 
 const RowHeader = ({
-  data
+  data,
+  startDate,
 }) => {
-  const cells = values.map(v => <Cell key={v}>{v}</Cell>);
+  const cells = weekdays.map((v, i) => <Cell key={v}>{`${v} ${moment(startDate).add(i, 'day').format('DD/MM')}`}</Cell>);
   return (
     <RowContainer>
+      <Cell>Job</Cell>
       {cells}
+      <Cell>Total</Cell>
       <Divider />
     </RowContainer>
   );
@@ -28,7 +30,7 @@ export default RowHeader;
 const RowContainer = styled(View)`
   flex-direction: row;
   margin-top: 10px;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 `;
 
 const Cell = styled(Text)`

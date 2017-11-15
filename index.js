@@ -1,4 +1,5 @@
 import React from 'react';
+import moment from 'moment';
 import { styled, View, Text } from 'bappo-components';
 import TimesheetHeader from './TimesheetHeader';
 import RowHeader from './RowHeader';
@@ -23,31 +24,51 @@ class TableView extends React.Component {
     this.setState({ timesheet });
   }
 
+  switchWeek = async (isNext) => {
+    const { $navigation, $models } = this.props;
+    const { timesheet } = this.state;
+
+    const weekGap = isNext ? 1 : -1;
+    const targetWeekStartingOn = moment(timesheet.weekStartingOn).add(weekGap, 'week').format('YYYY-MM-DD');
+
+    let targetTimesheet;
+    targetTimesheet = await $models.Timesheet.findOne({
+      where: {
+        weekStartingOn: targetWeekStartingOn,
+        person_id: timesheet.person_id,
+      },
+    });
+
+    if (!targetTimesheet) {
+      // create new time sheet
+      targetTimesheet = await $models.Timesheet.create({
+        weekStartingOn: targetWeekStartingOn,
+        person_id: timesheet.person_id,
+      });
+    }
+    // navigate to target week
+    $navigation.navigate('TimesheetDetailsPage', { recordId: targetTimesheet.id });
+  }
+
   render() {
+    const { timesheet } = this.state;
+    if (!timesheet) return null;
+
     return (
       <Container>
-        <TimesheetHeader timesheet={this.state.timesheet} />
+        <TimesheetHeader
+          timesheet={timesheet}
+          switchWeek={this.switchWeek}
+        />
+        <RowHeader startDate={timesheet.weekStartingOn} />
+        <JobRows
+          timesheet={timesheet}
+          {...this.props}
+        />
       </Container>
     );
   }
 }
-
-
-// const TableView = ({
-//   ...props
-// }) => {
-//   const { recordId } = props.$navigation.state.params;
-
-//   return (
-//     <Container>
-//       <TimeSheetHeader recordId={recordId} />
-//       <RowHeader />
-//       <JobRows
-//         {...props}
-//       />
-//     </Container>
-//   );
-// }
 
 export default TableView;
 
