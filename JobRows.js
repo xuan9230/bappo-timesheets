@@ -5,7 +5,8 @@ import EntryDetails from './EntryDetails';
 
 class JobRows extends React.Component {
   state = {
-    jobs: [],
+    // Jobs dictionary: id-instance pairs
+    jobs: {},
     entries: [],
     entryMap: [],
     loading: true,
@@ -22,11 +23,10 @@ class JobRows extends React.Component {
   }
 
   fetchList = () => {
-    this.setState({ loading: true }, async () => {
-      const { $models, timesheet } = this.props;
-      const jobs = [];
-      const entryMap = [];
+    const { $models, timesheet } = this.props;
 
+    this.setState({ loading: true}, async () => {
+      //Fetch Entries
       const entries = await $models.TimesheetEntry.findAll({
         where: {
           timesheet_id: timesheet.id,
@@ -36,18 +36,31 @@ class JobRows extends React.Component {
         ]
       });
 
-      // Build entry map and track all involved jobs
-      entries.forEach(e => {
-        const dow = moment(e.date).day();
-        if (!entryMap[e.job_id]) {
-          entryMap[e.job_id] = [];
-          jobs.push(e.job);
-        }
-        entryMap[e.job_id][dow] = e;
-      });
+      // Set new state
+      this.setState((state) => {
+        const { jobs } = state;
+        const { $models, timesheet } = this.props;
+        const entryMap = [];
 
-      this.setState({ entries, entryMap, jobs, loading: false, selectedEntry: null });
-    });
+        // Build entry map and track all involved jobs
+        entries.forEach(e => {
+          const dow = moment(e.date).day();
+          if (!entryMap[e.job_id]) {
+            entryMap[e.job_id] = [];
+            jobs[e.job.id] = e.job;
+          }
+          entryMap[e.job_id][dow] = e;
+        });
+
+        return {
+          ...state,
+          entryMap,
+          entries,
+          jobs,
+          loading: false,
+        };
+      });
+    })
   }
 
   handleClickCell = (id, dayOfWeek, jobId) => {
@@ -73,11 +86,26 @@ class JobRows extends React.Component {
   }
 
   handleAddJob = () => {
-    const addJobRow = (data) => {
-      console.log(data);
+    const { $models, $popup } = this.props;
+
+    const addJobRow = async (data) => {
+      if (this.state.jobs[data.job_id]) return;
+
+      const job = await $models.Job.findById(data.job_id);
+      this.setState((state) => {
+        const { jobs, entryMap } = state;
+        if (!entryMap[job.id]) {
+          entryMap[job.id] = [];
+        }
+        jobs[job.id] = job;
+        return {
+          ...state,
+          jobs,
+          entryMap,
+        };
+      })
     }
 
-    const { $popup } = this.props;
     $popup.form({
       formKey: 'SelectJobForm',
       onSubmit: addJobRow,
@@ -88,15 +116,23 @@ class JobRows extends React.Component {
     const entriesToDelete = this.state.entryMap[jobId];
     const promiseArr = [];
 
+    // Delete all related entries
     entriesToDelete.forEach(entry => {
       if (entry) {
-        console.log(entry);
         promiseArr.push(this.props.$models.TimesheetEntry.destroyById(entry.id));
       }
     })
-
     await Promise.all(promiseArr);
-    this.fetchList();
+
+    // Remove the job row
+    this.setState((state) => {
+      const { jobs } = state;
+      delete jobs[jobId];
+      return {
+        ...state,
+        jobs,
+      };
+    }, () => this.fetchList());
   }
 
   renderJobRow = (job) => {
@@ -113,7 +149,7 @@ class JobRows extends React.Component {
           Array
             .from({ length: 5 }, (v, i) => i+1)
             .map(dow => {
-              const entry = this.state.entryMap[parseInt(job.id)][dow];
+              const entry = this.state.entryMap[job.id][dow];
               let hourOfDay;
               if (entry) {
                 hourOfDay = Number(entry.hours);
@@ -132,7 +168,7 @@ class JobRows extends React.Component {
               );
             })
         }
-        <TotalCell><Text>{total}</Text></TotalCell>
+        <Cell><Text>{total}</Text></Cell>
       </JobRowContainer>
     )
   }
@@ -149,8 +185,8 @@ class JobRows extends React.Component {
             .from({ length: 5 }, (v, i) => i+1)
             .map(dow => {
               let dayTotal = 0;
-              jobs.forEach(job => {
-                const entry = entryMap[parseInt(job.id)][dow];
+              Object.keys(jobs).forEach(jobId => {
+                const entry = entryMap[jobId][dow];
                 if (entry) {
                   dayTotal += Number(entry.hours);
                   weekTotal += Number(entry.hours);
@@ -158,13 +194,13 @@ class JobRows extends React.Component {
               });
 
               return (
-                <TotalCell key={`${dow}_total`}>
+                <Cell key={`${dow}_total`}>
                   <Text>{dayTotal}</Text>
-                </TotalCell>
+                </Cell>
               );
             })
         }
-        <TotalCell><Text>{weekTotal}</Text></TotalCell>
+        <Cell><Text>{weekTotal}</Text></Cell>
       </JobRowContainer>
     );
   }
@@ -177,7 +213,7 @@ class JobRows extends React.Component {
 
     return (
       <Container>
-        { jobs.map(this.renderJobRow) }
+        { Object.keys(jobs).map(jobId => this.renderJobRow(jobs[jobId])) }
         <NewJobButton onPress={this.handleAddJob}>
           <Text>New Job</Text>
         </NewJobButton>
@@ -203,31 +239,29 @@ const Container = styled(View)`
 
 const JobRowContainer = styled(View)`
   flex-direction: row;
-  margin-bottom: 7px;
+  align-items: center;
 `;
 
 const Cell = styled(View)`
+  margin: 5px;
   flex: 1;
   align-items: center;
 `;
 
 const RowCell = styled(View)`
+  margin: 5px;
   flex: 1;
   flex-direction: row;
   justify-content: center;
 `;
 
 const JobCell = styled(Cell)`
+  background-color: #eee;
   &:hover {
-    background-color: #eee;
     >div {
       opacity: 0.7;
     }
   }
-`;
-
-const TotalCell = styled(Cell)`
-  opacity: 0.5;
 `;
 
 const StyledButton = styled(Button)`
@@ -238,7 +272,7 @@ const StyledButton = styled(Button)`
 `;
 
 const DeleteJobButton = styled(Button)`
-  margin-right: 10px;
+  margin-right: 5px;
 `;
 
 const DeleteButtonText = styled(Text)`
@@ -248,5 +282,4 @@ const DeleteButtonText = styled(Text)`
 const NewJobButton = styled(Button)`
   width: 14.3%;
   align-items: center;
-  margin-bottom: 7px;
 `;
