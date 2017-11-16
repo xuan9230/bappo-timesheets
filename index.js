@@ -32,6 +32,7 @@ class TableView extends React.Component {
     const targetWeekStartingOn = moment(timesheet.weekStartingOn).add(weekGap, 'week').format('YYYY-MM-DD');
 
     let targetTimesheet;
+    let templateTimesheetId;
     targetTimesheet = await $models.Timesheet.findOne({
       where: {
         weekStartingOn: targetWeekStartingOn,
@@ -45,9 +46,17 @@ class TableView extends React.Component {
         weekStartingOn: targetWeekStartingOn,
         person_id: timesheet.person_id,
       });
+      templateTimesheetId = timesheet.id;
     }
+
     // navigate to target week
-    $navigation.navigate('TimesheetDetailsPage', { recordId: targetTimesheet.id });
+    $navigation.navigate(
+      'TimesheetDetailsPage',
+      {
+        recordId: targetTimesheet.id,
+        templateTimesheetId,
+      }
+    );
   }
 
   render() {

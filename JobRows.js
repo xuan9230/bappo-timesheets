@@ -13,19 +13,37 @@ class JobRows extends React.Component {
     selectedEntry: null,
   }
 
-  componentDidMount() {
-    this.fetchList();
-  }
+  async componentDidMount () {
+    const { $navigation, $models, timesheet } = this.props;
+    const { templateTimesheetId } = $navigation.state.params;
 
-  createEntry = async (data) => {
-    await this.props.$models.TimesheetEntry.create(data);
-    this.fetchList();
+    if (templateTimesheetId) {
+      // populate jobs from template timesheet
+      const jobs = {};
+      const entries = await $models.TimesheetEntry.findAll({
+        where: {
+          timesheet_id: templateTimesheetId,
+        },
+        include: [
+          { as: 'job' }
+        ]
+      });
+      entries.forEach((entry) => {
+        if (!jobs[entry.job.id]) {
+          jobs[entry.job.id] = entry.job;
+        }
+      })
+      this.setState({ jobs }, () => this.fetchList());
+    } else {
+      this.fetchList();
+    }
   }
 
   fetchList = () => {
     const { $models, timesheet } = this.props;
 
-    this.setState({ loading: true}, async () => {
+    this.setState({ loading: true }, async () => {
+
       //Fetch Entries
       const entries = await $models.TimesheetEntry.findAll({
         where: {
@@ -41,6 +59,11 @@ class JobRows extends React.Component {
         const { jobs } = state;
         const { $models, timesheet } = this.props;
         const entryMap = [];
+
+        // Initialize based on populated jobs
+        Object.keys(jobs).forEach((jobId) => {
+          if (!entryMap[jobId]) entryMap[jobId] = [];
+        })
 
         // Build entry map and track all involved jobs
         entries.forEach(e => {
@@ -61,6 +84,11 @@ class JobRows extends React.Component {
         };
       });
     })
+  }
+
+  createEntry = async (data) => {
+    await this.props.$models.TimesheetEntry.create(data);
+    this.fetchList();
   }
 
   handleClickCell = (id, dayOfWeek, jobId) => {
@@ -162,7 +190,9 @@ class JobRows extends React.Component {
                     hasValue={!!entry}
                     onPress={() => this.handleClickCell(entry && entry.id, dow, job.id)}
                   >
-                    <Text>{hourOfDay ? hourOfDay : 'Add'}</Text>
+                    <Text>
+                      {typeof hourOfDay === 'undefined' ? 'Add' : hourOfDay}
+                    </Text>
                   </StyledButton>
                 </JobCell>
               );
