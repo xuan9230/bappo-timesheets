@@ -1,9 +1,10 @@
 import React from 'react';
 import moment from 'moment';
-import { styled, View, Text } from 'bappo-components';
+import { styled, View } from 'bappo-components';
 import TimesheetHeader from './TimesheetHeader';
 import RowHeader from './RowHeader';
 import JobRows from './JobRows';
+import { getMonday } from './utils';
 
 class TableView extends React.Component {
   state = {
@@ -18,9 +19,13 @@ class TableView extends React.Component {
         id: recordId,
       },
       include: [
-        { as: 'person' }
+        { as: 'consultant' }
       ]
     }))[0];
+
+    // Change day of a week to Monday if needed
+    timesheet.week = getMonday(timesheet.week);
+
     this.setState({ timesheet });
   }
 
@@ -29,22 +34,22 @@ class TableView extends React.Component {
     const { timesheet } = this.state;
 
     const weekGap = isNext ? 1 : -1;
-    const targetWeekStartingOn = moment(timesheet.weekStartingOn).add(weekGap, 'week').format('YYYY-MM-DD');
+    const targetWeek = moment(getMonday(timesheet.week)).add(weekGap, 'week').format('YYYY-MM-DD');
 
     let targetTimesheet;
     let templateTimesheetId;
     targetTimesheet = await $models.Timesheet.findOne({
       where: {
-        weekStartingOn: targetWeekStartingOn,
-        person_id: timesheet.person_id,
+        week: targetWeek,
+        consultant_id: timesheet.consultant_id,
       },
     });
 
     if (!targetTimesheet) {
       // create new time sheet
       targetTimesheet = await $models.Timesheet.create({
-        weekStartingOn: targetWeekStartingOn,
-        person_id: timesheet.person_id,
+        week: targetWeek,
+        consultant_id: timesheet.consultant_id,
       });
       templateTimesheetId = timesheet.id;
     }
@@ -69,7 +74,7 @@ class TableView extends React.Component {
           timesheet={timesheet}
           switchWeek={this.switchWeek}
         />
-        <RowHeader startDate={timesheet.weekStartingOn} />
+        <RowHeader startDate={timesheet.week} />
         <JobRows
           timesheet={timesheet}
           {...this.props}

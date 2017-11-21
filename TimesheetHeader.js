@@ -10,7 +10,7 @@ const TimesheetHeader = ({
   return (
     <Container>
       <Title>
-        {`${timesheet.person.name}'s Timesheet`}
+        {`${timesheet.consultant.name}'s Timesheet`}
       </Title>
       <SwitchButton onPress={() => switchWeek(false)}>
         <ButtonText>{'<'}</ButtonText>

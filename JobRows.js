@@ -14,7 +14,7 @@ class JobRows extends React.Component {
   }
 
   async componentDidMount () {
-    const { $navigation, $models, timesheet } = this.props;
+    const { $navigation, $models } = this.props;
     const { templateTimesheetId } = $navigation.state.params;
 
     if (templateTimesheetId) {
@@ -57,10 +57,9 @@ class JobRows extends React.Component {
       // Set new state
       this.setState((state) => {
         const { jobs } = state;
-        const { $models, timesheet } = this.props;
         const entryMap = [];
 
-        // Initialize based on populated jobs
+        // Initialize based on previously populated jobs
         Object.keys(jobs).forEach((jobId) => {
           if (!entryMap[jobId]) entryMap[jobId] = [];
         })
@@ -99,7 +98,7 @@ class JobRows extends React.Component {
     } else {
       // add new entry
       const { timesheet, $popup } = this.props;
-      const date = moment(timesheet.weekStartingOn).add(dayOfWeek - 1, 'day').format('YYYY-MM-DD');
+      const date = moment(timesheet.week).add(dayOfWeek - 1, 'day').format('YYYY-MM-DD');
       $popup.form({
         formKey: 'TimesheetEntryForm',
         initialValues: {
@@ -113,13 +112,39 @@ class JobRows extends React.Component {
     }
   }
 
-  handleAddJob = () => {
+  handleAddJob = async () => {
     const { $models, $popup } = this.props;
+    const { jobs } = this.state;
 
-    const addJobRow = async (data) => {
-      if (this.state.jobs[data.job_id]) return;
+    // Fetch job assignments, and filter out already selected jobs
+    const jobAssignments = await $models.JobAssignment.findAll({
+      where: {
+        job_id: {
+          $notIn: Object.keys(jobs),
+        },
+        consultant_id: 1,
+      },
+      include: [
+        { as: 'job' }
+      ]
+    });
 
-      const job = await $models.Job.findById(data.job_id);
+    const jobOptions = jobAssignments.map(a => ({
+      id: a.job.id,
+      label: a.job.name,
+    }));
+
+    // Local cache for adding new job
+    const newJobsDict = jobAssignments.reduce((acc, val) => {
+      acc[val.job_id] = val.job;
+      return acc;
+    }, {})
+
+    // Add new job to state
+    const addJobRow = (data) => {
+      if (jobs[data.job_id]) return;
+
+      const job = newJobsDict[data.job];
       this.setState((state) => {
         const { jobs, entryMap } = state;
         if (!entryMap[job.id]) {
@@ -131,11 +156,20 @@ class JobRows extends React.Component {
           jobs,
           entryMap,
         };
-      })
+      });
     }
 
     $popup.form({
-      formKey: 'SelectJobForm',
+      fields: [
+        {
+          name: 'job',
+          label: 'Job',
+          type: 'FixedList',
+          properties: {
+            options: jobOptions
+          }
+        }
+      ],
       onSubmit: addJobRow,
     });
   }
